@@ -2,7 +2,8 @@ from dedup.management.commands.deduplicate import Command, Dedup
 from tatoeba2.models import (
     Sentences, SentenceComments, SentencesTranslations, Contributions,
     TagsSentences, SentencesSentencesLists, FavoritesUsers, SentenceAnnotations,
-    Contributions, Users, Wall, Languages, UsersSentences, Transcriptions
+    Contributions, Users, Wall, Languages, UsersSentences, Transcriptions,
+    ReindexFlags
     )
 from django.db import transaction, IntegrityError
 from django.db.models import Q
@@ -210,6 +211,7 @@ class TestDedup():
         dedup.delete_sents(8, [6, 7])
         assert Sentences.objects.filter(id__in=[6,7]).count() == 0
         assert Contributions.objects.filter(sentence_id__in=[6, 7], type='sentence', action='delete').count() == 2
+        assert ReindexFlags.objects.filter(sentence_id__in=[6, 7], lang='eng', indexed=0, type='removal').count() == 2
 
     def test_full_scan(db, sents):
         assert Sentences.objects.all().count() == 21
@@ -255,6 +257,7 @@ class TestDedup():
         assert SentenceComments.objects.all().count() == 3
         assert Users.objects.all().count() == 0
         assert Wall.objects.all().count() == 1
+        assert ReindexFlags.objects.all().count() == 0
 
     def test_linked_dups_merge(db, sents, linked_dups, dedup):
         assert not raises(

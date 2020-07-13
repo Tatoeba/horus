@@ -6,7 +6,7 @@ from django.conf import settings
 from tatoeba2.models import (
     Sentences, SentencesTranslations, Contributions, Users, Wall,
     SentenceComments, WallThreadsLastMessage, UsersSentences, Transcriptions,
-    Audios
+    Audios, ReindexFlags
     )
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -172,12 +172,13 @@ class Dedup(object):
         cls.out_log.info(msg)
 
     @classmethod
-    def log_sents_del(cls, main_id, ids, sents):
+    def log_and_flag_sents_del(cls, main_id, ids, sents):
         sents = list(sents)
-        logs = []
+        contribs = []
+        flags = []
 
         for sent in sents:
-            logs.append(Contributions(
+            contribs.append(Contributions(
                 sentence_id=sent.id,
                 sentence_lang=sent.lang,
                 text=sent.text,
@@ -186,17 +187,25 @@ class Dedup(object):
                 type='sentence',
                 user_id=cls.bot.id if hasattr(cls, 'bot') else 0,
                 ))
+            flags.append(ReindexFlags(
+                sentence_id=sent.id,
+                lang=sent.lang,
+                indexed=0,
+                type='removal',
+                ))
 
         if not cls.dry:
-            Contributions.objects.bulk_create(logs)
+            Contributions.objects.bulk_create(contribs)
+            ReindexFlags.objects.bulk_create(flags)
 
         cls.log_entry(main_id, ids, 'delete Sentences', 'delete', 'sentence_id', sents)
-        cls.log_entry(main_id, ids, 'log_deletion Contributions', 'insert', 'sentence_id', logs)
+        cls.log_entry(main_id, ids, 'log_deletion Contributions', 'insert', 'sentence_id', contribs)
+        cls.log_entry(main_id, ids, 'flag_deleted ReindexFlags', 'insert', 'sentence_id', flags)
 
     @classmethod
     def delete_sents(cls, main_id, ids):
         sents = Sentences.objects.filter(id__in=ids)
-        cls.log_sents_del(main_id, ids, sents)
+        cls.log_and_flag_sents_del(main_id, ids, sents)
         if not cls.dry:
             sents.delete()
 
