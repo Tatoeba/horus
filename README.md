@@ -36,6 +36,6 @@ This project houses a bridge project and scripts written in python/django for ta
 - Running the test suite:
   - You can run the accompanying test suite using:
   ```sh
-  py.test
+  py.test --mysql dedup/
   ```
   - Remember that the test suite requires django to be able to manage tables.
