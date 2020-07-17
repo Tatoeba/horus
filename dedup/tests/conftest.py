@@ -117,6 +117,7 @@ def sents(db, request):
             clean_up('UsersSentences')
             clean_up('Transcriptions')
             clean_up('Audios')
+            clean_up('ReindexFlags')
 
         request.addfinalizer(fin)
 

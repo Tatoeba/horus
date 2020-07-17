@@ -208,6 +208,7 @@ class TestDedup():
     def test_delete_sents(db, sents, dedup):
         assert Sentences.objects.filter(id__in=[6,7]).count() == 2
         assert Contributions.objects.filter(sentence_id__in=[6, 7], type='sentence', action='delete').count() == 0
+        assert ReindexFlags.objects.all().count() == 0
         dedup.delete_sents(8, [6, 7])
         assert Sentences.objects.filter(id__in=[6,7]).count() == 0
         assert Contributions.objects.filter(sentence_id__in=[6, 7], type='sentence', action='delete').count() == 2
@@ -215,9 +216,11 @@ class TestDedup():
 
     def test_full_scan(db, sents):
         assert Sentences.objects.all().count() == 21
+        assert ReindexFlags.objects.all().count() == 0
         cmd = Command()
         cmd.handle()
         assert Sentences.objects.all().count() == 10
+        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 11
         assert len(cmd.all_dups) == 11
         assert len(cmd.all_mains) == 5
         assert cmd.ver_dups
@@ -226,9 +229,11 @@ class TestDedup():
 
     def test_incremental_scan(db, sents):
         assert Sentences.objects.all().count() == 21
+        assert ReindexFlags.objects.all().count() == 0
         cmd = Command()
         cmd.handle(since='2014-1-4')
         assert Sentences.objects.all().count() == 16
+        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 5
         assert len(cmd.all_dups) == 5
         assert len(cmd.all_mains) == 2
         assert cmd.ver_dups
