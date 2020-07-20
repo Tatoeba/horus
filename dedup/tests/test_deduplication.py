@@ -320,11 +320,13 @@ class TestDedup():
         assert cmd.ver_audio
         assert cmd.ver_mains
 
-    def test_suppress_error_log(db, dedup):
-        def raise_error(a=True):
+    def test_suppress_error_log(db, sents, dedup):
+        def raise_error(a):
             raise Exception('An error was raised')
 
-        dedup.suppress_error(raise_error, True)
+        sentence = Sentences.objects.get(id=2)
+        dedup.suppress_error(raise_error, sentence)
         with open(dedup.log_file_path) as f:
             log_content = f.read()
             assert 'An error was raised' in log_content
+            assert '<Sentence: id=2>' in log_content

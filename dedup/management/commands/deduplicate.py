@@ -377,7 +377,7 @@ class Dedup(object):
             entry['operation'] = 'error'
             entry['args'] = args
             entry['error_msg'] = e.message
-            cls.file_log.info(json.dumps(entry))
+            cls.file_log.info(json.dumps(entry, default=str))
 
             entry = []
             entry.append(colored('ERROR', 'red', attrs=['bold']))
