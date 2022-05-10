@@ -402,6 +402,8 @@ class Dedup(object):
         cls.update_merge('SentenceAnnotations', main_sent.id, ids, 'meaning_id')
         cls.update_merge('UsersSentences', main_sent.id, ids)
         cls.update_merge('Transcriptions', main_sent.id, ids)
+        cls.update_merge('Audios', main_sent.id, ids)
+        cls.update_merge('DisabledAudios', main_sent.id, ids)
 
         # delete and log duplicates
         cls.delete_sents(main_sent.id, ids)
