@@ -80,15 +80,16 @@ class Dedup(object):
     def prioritize(cls, sents):
         sents = sorted(sents, key=lambda x: x.id)
 
-        cls.has_audio = set()
+        cls.has_audio = []
         cls.has_owner = set()
         cls.not_approved = False
 
         for sent in sents:
 
             # filter sents with audio
-            if Audios.objects.filter(sentence_id=sent.id).count() > 0:
-                cls.has_audio.add(sent)
+            audio_count = Audios.objects.filter(sentence_id=sent.id).count()
+            for i in xrange(audio_count):
+                cls.has_audio.append(sent)
 
             # filter sents with owners
             if sent.user_id:
@@ -100,7 +101,7 @@ class Dedup(object):
 
         # has_audio, lowest id
         if cls.has_audio:
-            main_sent = sorted(list(cls.has_audio), key=lambda x: x.id)[0]
+            main_sent = sorted(cls.has_audio, key=lambda x: x.id)[0]
 
         # has_owner, lowest id
         elif cls.has_owner:
@@ -596,7 +597,7 @@ class Command(Dedup, BaseCommand):
                 sents = list(sents)
                 # determine main sentence based on priority rules
                 main_sent = self.prioritize(sents)
-                self.all_audio.extend(list(self.has_audio))
+                self.all_audio.extend(self.has_audio)
                 self.all_mains.append(main_sent.id)
                 # separate duplicates from main sentence
                 sents.remove(main_sent)
@@ -640,7 +641,7 @@ class Command(Dedup, BaseCommand):
                     sents = list(Sentences.objects.filter(id__in=ids))
 
                     main_sent = self.prioritize(sents)
-                    self.all_audio.extend(list(self.has_audio))
+                    self.all_audio.extend(self.has_audio)
                     self.all_mains.append(main_sent.id)
 
                     # separate duplicates from main sent
@@ -669,7 +670,7 @@ class Command(Dedup, BaseCommand):
 
         # all audio should exist
         self.log_report('All audio intact? ')
-        self.ver_audio = Audios.objects.filter(sentence_id__in=self.all_mains).distinct().count() == len(self.all_audio)
+        self.ver_audio = Audios.objects.filter(sentence_id__in=self.all_mains).count() == len(self.all_audio)
         msg = 'YES' if self.ver_audio else 'NO'
         self.log_report(msg)
 
