@@ -1,7 +1,7 @@
 from tatoeba2.models import (
     Sentences, SentenceComments, SentencesTranslations, Users, TagsSentences,
     SentencesSentencesLists, FavoritesUsers, SentenceAnnotations, Contributions,
-    Wall, UsersSentences, Transcriptions, Audios
+    Wall, UsersSentences, Transcriptions, Audios, DisabledAudios
     )
 from datetime import datetime
 from dedup.management.commands.deduplicate import Dedup
@@ -50,6 +50,13 @@ def sents(db, request):
     Sentences(text='Has owner, Has audio, Correctness -1 duplicated.', lang='eng', modified=datetime(2014, 1, 5)).save()
     Audios(sentence_id=20, user_id=1, created=datetime(2016, 1, 1), modified=datetime(2016, 1, 1)).save()
     Sentences(text='Has owner, Has audio, Correctness -1 duplicated.', lang='eng', correctness=-1, modified=datetime(2014, 1, 5)).save()
+
+    # has owner, each has audio  22-24
+    for i in xrange(3): Sentences(text='Each has audio, duplicated.', lang='eng', modified=datetime(2022, 5, 1)).save()
+    Audios(sentence_id=22, user_id=1, created=datetime(2022, 5, 5), modified=datetime(2022, 5, 5)).save()
+    Audios(sentence_id=23, user_id=2, created=datetime(2022, 5, 5), modified=datetime(2022, 5, 5)).save()
+    Audios(sentence_id=23, user_id=3, created=datetime(2022, 5, 5), modified=datetime(2022, 5, 5)).save()
+    DisabledAudios(id=7, sentence_id=24, user_id=1, created=datetime(2022, 5, 5), modified=datetime(2022, 5, 5)).save()
 
     for i in xrange(6, 8+1): SentenceComments(sentence_id=i, text='Comment on '+str(i), user_id=1, created=datetime.now(), hidden=0).save()
 
@@ -118,6 +125,7 @@ def sents(db, request):
             clean_up('Transcriptions')
             clean_up('Audios')
             clean_up('ReindexFlags')
+            clean_up('DisabledAudios')
 
         request.addfinalizer(fin)
 

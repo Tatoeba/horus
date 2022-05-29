@@ -3,7 +3,7 @@ from tatoeba2.models import (
     Sentences, SentenceComments, SentencesTranslations, Contributions,
     TagsSentences, SentencesSentencesLists, FavoritesUsers, SentenceAnnotations,
     Contributions, Users, Wall, Languages, UsersSentences, Transcriptions,
-    ReindexFlags
+    ReindexFlags, Audios, DisabledAudios
     )
 from django.db import transaction, IntegrityError
 from django.db.models import Q
@@ -90,7 +90,8 @@ class TestDedup():
             if k == ('Normal, duplicated.', 'eng') or \
                k == ('Has owner, duplicated.', 'eng') or \
                k == ('Has audio, duplicated.', 'eng') or \
-               k == ('Correctness -1, duplicated.', 'eng'):
+               k == ('Correctness -1, duplicated.', 'eng') or \
+               k == ('Each has audio, duplicated.', 'eng'):
                 assert len(v) == 3
 
             if k == ('Normal, not duplicated.', 'eng') or \
@@ -101,7 +102,7 @@ class TestDedup():
 
             k_cnt += 1
 
-        assert k_cnt == 10
+        assert k_cnt == 11
 
     def test_prioritize(db, sents, dedup):
         sents = list(Sentences.objects.filter(id__range=[2, 4]))
@@ -120,6 +121,9 @@ class TestDedup():
         sents = list(Sentences.objects.filter(id__range=[18, 21]))
         assert dedup.prioritize(sents).id == 20
         assert dedup.not_approved is True
+
+        sents = list(Sentences.objects.filter(id__range=[22, 24]))
+        assert dedup.prioritize(sents).id == 22
 
     def test_merge_comments(db, sents, dedup):
         assert SentenceComments.objects.filter(sentence_id=8).count() == 1
@@ -205,6 +209,22 @@ class TestDedup():
         assert len(trans) == 1
         assert trans[0].text == 'transcription 1' and trans[0].script == 'Hrkt' and trans[0].sentence_id == 5
 
+    def test_merge_audios(db, sents, dedup):
+        assert Audios.objects.filter(sentence_id__range=[22, 24]).count() == 3
+        dedup.update_merge('Audios', 22, [23, 24], 'sentence_id')
+        audios = Audios.objects.filter(sentence_id=22)
+        assert len(audios) == 3
+        assert audios[0].user_id == 1
+        assert audios[1].user_id == 2
+        assert audios[2].user_id == 3
+
+    def test_merge_disabled_audios(db, sents, dedup):
+        assert DisabledAudios.objects.filter(sentence_id__range=[22, 24]).count() == 1
+        dedup.update_merge('DisabledAudios', 22, [23, 24], 'sentence_id')
+        disabled_audios = DisabledAudios.objects.filter(sentence_id=22)
+        assert len(disabled_audios) == 1
+        assert disabled_audios[0].user_id == 1
+
     def test_delete_sents(db, sents, dedup):
         assert Sentences.objects.filter(id__in=[6,7]).count() == 2
         assert Contributions.objects.filter(sentence_id__in=[6, 7], type='sentence', action='delete').count() == 0
@@ -215,27 +235,27 @@ class TestDedup():
         assert ReindexFlags.objects.filter(sentence_id__in=[6, 7], lang='eng', indexed=0, type='removal').count() == 2
 
     def test_full_scan(db, sents):
-        assert Sentences.objects.all().count() == 21
+        assert Sentences.objects.all().count() == 24
         assert ReindexFlags.objects.all().count() == 0
         cmd = Command()
         cmd.handle()
-        assert Sentences.objects.all().count() == 10
-        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 11
-        assert len(cmd.all_dups) == 11
-        assert len(cmd.all_mains) == 5
+        assert Sentences.objects.all().count() == 11
+        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 13
+        assert len(cmd.all_dups) == 13
+        assert len(cmd.all_mains) == 6
         assert cmd.ver_dups
         assert cmd.ver_audio
         assert cmd.ver_mains
 
     def test_incremental_scan(db, sents):
-        assert Sentences.objects.all().count() == 21
+        assert Sentences.objects.all().count() == 24
         assert ReindexFlags.objects.all().count() == 0
         cmd = Command()
         cmd.handle(since='2014-1-4')
-        assert Sentences.objects.all().count() == 16
-        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 5
-        assert len(cmd.all_dups) == 5
-        assert len(cmd.all_mains) == 2
+        assert Sentences.objects.all().count() == 17
+        assert ReindexFlags.objects.filter(type='removal', indexed=0).count() == 7
+        assert len(cmd.all_dups) == 7
+        assert len(cmd.all_mains) == 3
         assert cmd.ver_dups
         assert cmd.ver_audio
         assert cmd.ver_mains
@@ -251,13 +271,13 @@ class TestDedup():
     def test_comment_post(db, sents):
         cmd = Command()
         cmd.handle(cmnt=True)
-        assert SentenceComments.objects.filter(text__contains='This sentence has been deleted').count() == 11
-        assert SentenceComments.objects.filter(text__contains='Duplicates of this sentence have been deleted').count() == 5
+        assert SentenceComments.objects.filter(text__contains='This sentence has been deleted').count() == 13
+        assert SentenceComments.objects.filter(text__contains='Duplicates of this sentence have been deleted').count() == 6
 
     def test_dry_run(db, sents):
         cmd = Command()
         cmd.handle(dry=True, cmnt=True, wall=True)
-        assert Sentences.objects.all().count() == 21
+        assert Sentences.objects.all().count() == 24
         assert Contributions.objects.all().count() == 5
         assert SentenceComments.objects.all().count() == 3
         assert Users.objects.all().count() == 0
@@ -310,12 +330,12 @@ class TestDedup():
         assert cmd.td == timedelta(days=365+60+3, hours=5, minutes=4, seconds=2)
 
     def test_suppress_incremental(db, sents):
-        assert Sentences.objects.all().count() == 21
+        assert Sentences.objects.all().count() == 24
         cmd = Command()
         cmd.handle(since='2014-1-4', suppress=True)
-        assert Sentences.objects.all().count() == 16
-        assert len(cmd.all_dups) == 5
-        assert len(cmd.all_mains) == 2
+        assert Sentences.objects.all().count() == 17
+        assert len(cmd.all_dups) == 7
+        assert len(cmd.all_mains) == 3
         assert cmd.ver_dups
         assert cmd.ver_audio
         assert cmd.ver_mains
